@@ -98,6 +98,8 @@ export interface CameraState {
   gain: number;
   auto_gain: boolean;
   lens_position: number | null;
+  // a tap on the plate nearer the camera, (x, y) from 0 to 1 across the upright picture
+  near_plate: [number, number] | null;
   kind: string;
   exposure_actual_us: number | null;
   gain_actual: number | null;
@@ -107,7 +109,9 @@ export interface CameraState {
   too_dark: boolean;
 }
 
-export type CameraChange = Partial<Pick<CameraState, "quarter_turns" | "exposure_us" | "gain" | "auto_gain">>;
+export type CameraChange = Partial<Pick<CameraState, "quarter_turns" | "exposure_us" | "gain" | "auto_gain">> & {
+  near_plate?: number[]; // an empty list forgets it
+};
 
 // The live stream, as docs/API_CONTRACT.md in kvihtai-core describes it.
 export interface Live {
