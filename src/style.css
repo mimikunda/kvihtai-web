@@ -614,12 +614,16 @@ main {
 /* camera */
 
 .preview {
+  --ratio: 0.5625;
   position: relative;
+  width: 100%;
+  max-width: calc(62vh * var(--ratio));
+  aspect-ratio: var(--ratio);
   margin: 0 auto;
   border-radius: 12px;
   overflow: hidden;
   background: #000;
-  max-height: 62vh;
+  cursor: zoom-in;
 }
 
 .preview img {
@@ -629,6 +633,10 @@ main {
   object-fit: contain;
 }
 
+.preview.frozen img {
+  filter: grayscale(1) brightness(0.55);
+}
+
 .preview svg {
   position: absolute;
   inset: 0;
@@ -636,15 +644,110 @@ main {
   height: 100%;
 }
 
-.preview .hint {
+.preview.full {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  aspect-ratio: auto;
+  border-radius: 0;
+  cursor: default;
+}
+
+body.no-scroll {
+  overflow: hidden;
+}
+
+.live-chip {
   position: absolute;
+  top: calc(10px + env(safe-area-inset-top, 0px));
   left: 10px;
-  bottom: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 10px;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.65);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.live-chip::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.live-chip.good {
+  color: var(--good);
+}
+
+.live-chip.bad {
+  color: var(--bad);
+}
+
+.icon-btn {
+  position: absolute;
+  top: calc(8px + env(safe-area-inset-top, 0px));
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+.preview .full-close,
+.preview .full-tap,
+.preview.full .full-open {
+  display: none;
+}
+
+.preview.full .full-close,
+.preview.full .full-tap {
+  display: inline-flex;
+}
+
+.preview-foot {
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.preview-foot > * {
+  pointer-events: auto;
+}
+
+.preview .hint {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.65);
   font-size: 13px;
   font-weight: 600;
+}
+
+.preview.full .hint {
+  font-size: 15px;
+  padding: 8px 14px;
 }
 
 .alerts {
@@ -660,6 +763,72 @@ main {
 .banner.info {
   background: var(--velocity-soft);
   color: #bfe6ff;
+}
+
+/* setup steps */
+
+.step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 0;
+  border-top: 1px solid var(--line);
+}
+
+.step:last-child {
+  padding-bottom: 2px;
+}
+
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.step-head h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.step-mark {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 750;
+}
+
+.step[data-state="done"] .step-mark {
+  background: rgba(62, 207, 142, 0.18);
+  color: var(--good);
+}
+
+.step[data-state="todo"] .step-mark {
+  background: rgba(255, 176, 32, 0.18);
+  color: var(--warn);
+}
+
+.step-note {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 13px;
+  text-align: right;
+}
+
+.step[data-state="todo"] .step-note {
+  color: var(--warn);
+}
+
+.step-text {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
 }
 
 .controls {
