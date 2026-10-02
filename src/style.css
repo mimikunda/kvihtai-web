@@ -647,6 +647,21 @@ main {
   font-weight: 600;
 }
 
+.alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.alerts:empty {
+  display: none;
+}
+
+.banner.info {
+  background: var(--velocity-soft);
+  color: #bfe6ff;
+}
+
 .controls {
   display: flex;
   flex-direction: column;

@@ -27,6 +27,8 @@ class Store {
   private stream = new LiveStream((live) => this.onLive(live));
   private streaming = false;
   private latestId: string | null | undefined = undefined;
+  private framesIn = -1;
+  private framesAt = 0;
 
   on<K extends keyof Events>(event: K, fn: Listener<Events[K]>): () => void {
     let set = this.listeners.get(event);
@@ -60,6 +62,10 @@ class Store {
         this.emit("connection", true);
         api.clock().catch(() => undefined);
       }
+      if (status.frames_in !== this.framesIn) {
+        this.framesIn = status.frames_in;
+        this.framesAt = performance.now();
+      }
       this.status = status;
       this.emit("status", status);
       this.follow(status.state === "set");
@@ -73,6 +79,11 @@ class Store {
     if (document.visibilityState === "visible") {
       this.timer = window.setTimeout(() => this.poll(), this.status?.state === "set" ? 500 : 1000);
     }
+  }
+
+  // Seconds since the camera last sent a frame, as far as the polls can tell.
+  get stillFor(): number {
+    return this.framesIn < 0 ? 0 : (performance.now() - this.framesAt) / 1000;
   }
 
   private follow(on: boolean): void {
