@@ -23,10 +23,15 @@ Three views, for a phone at the gym:
   the newest set once it is analysed: reps, mean and peak velocity, bar path,
   velocity over time, and the set's video with the path drawn over it.
 - **History:** every set, by day.
-- **Camera:** what the camera sees, with the plates the station has found
-  ringed, and the settings for aiming it: rotation, focus, exposure and
-  brightness. Also the station's state: frame rate, temperature, recording,
-  free space, and its log.
+- **Camera:** what the camera sees, live, with the plates the station has
+  found ringed; tap it for full screen. Below it the setup, in the order it is
+  done: picture upright, focus (autofocus or a distance by hand), light, and
+  the plate nearer the camera, tapped once. Then the station's state: frame
+  rate, temperature, recording, free space, how long it has run, and its log.
+
+Above every view the app says in words what is wrong, if anything: the camera
+sending no picture, the station restarting because of it, frames lost,
+undervoltage, heat, recording errors.
 
 It talks only to the kvihtai-core station that serves it: `/api/v1/...` for
 status and sets, and the live stream `/ws/live` while a set goes on. Charts are

@@ -5,6 +5,7 @@ import { drawTrail, redrawOnResize } from "../charts";
 import { h } from "../dom";
 import { mps } from "../format";
 import { store } from "../store";
+import { alertBox } from "./alerts";
 import { setCard, type SetCard } from "./setCard";
 
 export function nowView(root: HTMLElement): () => void {
@@ -29,7 +30,8 @@ export function nowView(root: HTMLElement): () => void {
     h("span", {}, "Analysing the set…"),
   );
   const latestSlot = h("div");
-  root.append(liveCard, analysing, latestSlot);
+  const alerts = alertBox();
+  root.append(alerts.el, liveCard, analysing, latestSlot);
 
   let card: SetCard | null = null;
   const showLatest = (result: SetResult | null) => {
@@ -58,10 +60,12 @@ export function nowView(root: HTMLElement): () => void {
     liveCard.hidden = !inSet;
     analysing.hidden = !(s && s.analysing > 0 && !inSet);
     if (inSet) drawTrail(trailCanvas, store.trail);
+    alerts.update();
   };
 
   const offs = [
     store.on("status", onStatus),
+    store.on("connection", () => onStatus(store.status)),
     store.on("latest", showLatest),
     store.on("live", (live) => {
       if (liveCard.hidden) return;

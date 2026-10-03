@@ -28,6 +28,9 @@ export interface Status {
   };
   clock: { offset_s: number; now: string };
   brightness: number | null;
+  uptime_s?: number;
+  // what went wrong before, kept across restarts; newest last
+  incidents?: { at: string; what: string }[];
 }
 
 export interface Rise {
@@ -106,10 +109,13 @@ export interface CameraState {
   lens_actual: number | null;
   lux: number | null;
   brightness: number | null;
+  focus?: "focusing" | "focused" | "failed" | null;
   too_dark: boolean;
 }
 
-export type CameraChange = Partial<Pick<CameraState, "quarter_turns" | "exposure_us" | "gain" | "auto_gain">> & {
+export type CameraChange = Partial<
+  Pick<CameraState, "quarter_turns" | "exposure_us" | "gain" | "auto_gain"> & { lens_position: number }
+> & {
   near_plate?: number[]; // an empty list forgets it
 };
 
