@@ -4,7 +4,7 @@
 // stream runs only while a set is going on, since it is the only time it says
 // anything. The newest set is fetched whenever the status names a new one.
 
-import { api, LiveStream, type Live, type SetResult, type Status } from "./api";
+import { api, ApiError, LiveStream, type Live, type SetResult, type Status } from "./api";
 
 type Events = {
   status: Status | null;
@@ -18,6 +18,8 @@ type Listener<T> = (value: T) => void;
 class Store {
   status: Status | null = null;
   connected = true;
+  // the station answers, but its status with an error: a fault in the station, not the Wi-Fi
+  broken: string | null = null;
   latest: SetResult | null = null;
   trail: { x: number; y: number }[] = [];
   lastLive: Live | null = null;
@@ -57,6 +59,10 @@ class Store {
     try {
       const status = await api.status();
       this.failures = 0;
+      if (this.broken) {
+        this.broken = null;
+        this.emit("connection", true);
+      }
       if (!this.connected) {
         this.connected = true;
         this.emit("connection", true);
@@ -70,8 +76,12 @@ class Store {
       this.emit("status", status);
       this.follow(status.state === "set");
       if (status.last_set_id && status.last_set_id !== this.latestId) void this.loadLatest();
-    } catch {
-      if (++this.failures >= 3 && this.connected) {
+    } catch (e) {
+      if (e instanceof ApiError) {
+        this.failures = 0;
+        this.broken = e.detail || `error ${e.status}`;
+        this.emit("connection", true);
+      } else if (++this.failures >= 3 && this.connected) {
         this.connected = false;
         this.emit("connection", false);
       }
