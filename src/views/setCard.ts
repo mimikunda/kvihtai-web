@@ -2,8 +2,9 @@
 
 import type { Rise, SetResult } from "../api";
 import { drawBarPath, drawOverlay, drawVelocity, redrawOnResize } from "../charts";
-import { h } from "../dom";
-import { ago, best, clockTime, cm, mps, seconds, velocityLoss } from "../format";
+import { h, icons } from "../dom";
+import { ago, best, clockTime, cm, mps, seconds, tagLabel, velocityLoss } from "../format";
+import { editTags } from "./tags";
 
 export interface SetCard {
   el: HTMLElement;
@@ -31,6 +32,26 @@ export function setCard(result: SetResult, title: string, actions?: HTMLElement)
   const cleanups: (() => void)[] = [];
 
   const when = h("span", { class: "when num" }, `${clockTime(result.started_at)} · ${ago(result.started_at)}`);
+
+  // what was lifted, as the lifter said
+  const tagText = h("span", { class: "set-tags" });
+  const noteText = h("p", { class: "set-note" });
+  const editBtn = h("button", { class: "btn small", type: "button", html: `${icons.edit} Edit` });
+  const showTags = () => {
+    const label = tagLabel(result.tags);
+    tagText.textContent = label || "Lift and weight not given";
+    tagText.classList.toggle("muted", !label);
+    noteText.textContent = result.tags?.note ?? "";
+    noteText.hidden = !result.tags?.note;
+  };
+  editBtn.addEventListener("click", () =>
+    editTags(result, (saved) => {
+      result.tags = saved.tags;
+      showTags();
+    }),
+  );
+  showTags();
+  const tagRow = h("div", { class: "tag-row" }, tagText, editBtn);
   const hero = h(
     "div",
     { class: "hero" },
@@ -93,6 +114,12 @@ export function setCard(result: SetResult, title: string, actions?: HTMLElement)
     vid.addEventListener("loadeddata", paint);
     vid.addEventListener("seeked", paint);
     loop();
+    videoWrap = h(
+      "div",
+      {},
+      videoWrap,
+      h("div", { class: "row video-actions" }, h("a", { class: "btn small", href: v.url, download: `kvihtai-${result.set_id}.mp4`, html: `${icons.download} Download video` })),
+    );
     cleanups.push(() => {
       alive = false;
       if ("cancelVideoFrameCallback" in vid) vid.cancelVideoFrameCallback(handle);
@@ -125,6 +152,8 @@ export function setCard(result: SetResult, title: string, actions?: HTMLElement)
     "section",
     { class: "card" },
     h("div", { class: "card-head" }, h("h2", {}, title), when),
+    tagRow,
+    noteText,
     hero,
     reps.length ? repList : h("p", { class: "footnote" }, "No rep was found in this set."),
     charts,
