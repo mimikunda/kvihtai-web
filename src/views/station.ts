@@ -100,8 +100,9 @@ async function powerOverlay(action: PowerAction): Promise<void> {
   }
 
   if (action === "shutdown") {
-    // the station stops before the Pi does; the Pi needs a few seconds more
-    for (let s = 12; s > 0; s--) {
+    // the station stops answering before it has closed the recording, and the
+    // Pi needs a few seconds after that
+    for (let s = 20; s > 0; s--) {
       say("Almost off…", `The station has stopped. The Pi turns itself off in about ${s} s.`);
       await wait(1000);
     }
@@ -229,11 +230,13 @@ const KINDS: Record<string, string> = {
 function problemsCard(): { el: HTMLElement; load: () => Promise<void> } {
   const list = h("div", { class: "incidents" });
   const clear = h("button", { class: "btn small", type: "button" }, "Clear");
+  const more = h("button", { class: "btn small", type: "button", hidden: true });
+  let all = false;
   const download = h("a", { class: "btn", href: api.diagnosticsUrl, download: "", html: `${icons.download} Download diagnostics` });
   const { el, head } = card(
     "Problems",
     list,
-    h("div", { class: "row", style: "margin-top:12px" }, download),
+    h("div", { class: "row", style: "margin-top:12px" }, more, download),
     h("p", { class: "footnote" }, "The diagnostics are one file with the logs, the journal of this boot and the one before, and the settings. Send it with a description of what happened."),
   );
   head.append(clear);
@@ -241,9 +244,11 @@ function problemsCard(): { el: HTMLElement; load: () => Promise<void> } {
     try {
       const incidents = (await api.incidents()).slice().reverse();
       clear.hidden = incidents.length === 0;
+      more.hidden = incidents.length <= 5;
+      more.textContent = all ? "Show fewer" : `Show all ${incidents.length}`;
       list.replaceChildren(
         ...(incidents.length
-          ? incidents.map((i) =>
+          ? (all ? incidents : incidents.slice(0, 5)).map((i) =>
               h(
                 "div",
                 { class: `incident ${i.kind ?? ""}` },
@@ -257,6 +262,10 @@ function problemsCard(): { el: HTMLElement; load: () => Promise<void> } {
       list.replaceChildren(h("p", { class: "step-text" }, `Could not load them: ${problem(e)}`));
     }
   };
+  more.addEventListener("click", () => {
+    all = !all;
+    void load();
+  });
   clear.addEventListener("click", async () => {
     if (!(await confirmSheet("Clear the problems?", ["The list starts empty. The logs keep everything."], "Clear"))) return;
     try {
