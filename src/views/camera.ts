@@ -1,5 +1,7 @@
 // Setting up at the gym: what the camera sees, which plates the watcher has
-// found, and the settings that decide whether it can see them.
+// found, and the settings that decide whether it can see them. With the camera
+// off to the side both ends of the bar are in view; a tap on the one nearer the
+// camera tells the watcher which to follow.
 
 import { api, type CameraChange, type CameraState, type Status } from "../api";
 import { h, icons } from "../dom";
@@ -59,6 +61,13 @@ export function cameraView(root: HTMLElement): () => void {
     else if (alive) document.addEventListener("visibilitychange", () => refresh(), { once: true });
   };
 
+  const nearMark = (s: Status): SVGCircleElement[] => {
+    const p = cam?.near_plate;
+    if (!p || !s.frame) return [];
+    return [circle(p[0] * s.frame.w, p[1] * s.frame.h, 0.012 * Math.max(s.frame.w, s.frame.h), "near")];
+  };
+
+  let tapping = false;
   const showStatus = (s: Status | null) => {
     if (!s) return;
     if (s.frame) {
@@ -69,8 +78,10 @@ export function cameraView(root: HTMLElement): () => void {
     svg.replaceChildren(
       ...s.watched.map((p) => circle(p.x, p.y, p.r, "watched")),
       ...(s.plate ? [circle(s.plate.x, s.plate.y, s.plate.r, "followed")] : []),
+      ...nearMark(s),
     );
-    if (s.state === "set") hint.textContent = "Following the bar";
+    if (tapping) hint.textContent = "Tap the plate nearer the camera";
+    else if (s.state === "set") hint.textContent = "Following the bar";
     else if (s.state === "camera error") hint.textContent = "Camera error";
     else if (s.watched.length === 0) hint.textContent = "No plate in view";
     else hint.textContent = s.watched.length === 1 ? "1 plate in view" : `${s.watched.length} plates in view`;
@@ -86,6 +97,36 @@ export function cameraView(root: HTMLElement): () => void {
       alert("The camera did not take the setting.");
     }
   };
+
+  // Once after setting up, not before every lift: the near plate stays on the
+  // same side of the picture until the camera is moved.
+  const nearBtn = h("button", { class: "btn", type: "button" }, "Near plate");
+  const nearClear = h("button", { class: "btn", type: "button", html: icons.trash, "aria-label": "Forget the near plate" });
+  const showTapping = () => {
+    preview.classList.toggle("tapping", tapping);
+    nearBtn.textContent = tapping ? "Cancel" : cam?.near_plate ? "Near plate: change" : "Near plate: tap it";
+    nearClear.hidden = tapping || !cam?.near_plate;
+    showStatus(store.status);
+  };
+  nearBtn.addEventListener("click", () => {
+    tapping = !tapping;
+    showTapping();
+  });
+  nearClear.addEventListener("click", () => void change({ near_plate: [] }));
+  preview.addEventListener("click", (e) => {
+    const frame = store.status?.frame;
+    const ctm = svg.getScreenCTM();
+    if (!tapping || !frame || !ctm) return;
+    const pt = svg.createSVGPoint();
+    pt.x = e.clientX;
+    pt.y = e.clientY;
+    const p = pt.matrixTransform(ctm.inverse());
+    const x = p.x / frame.w;
+    const y = p.y / frame.h;
+    if (x < 0 || x > 1 || y < 0 || y > 1) return;
+    tapping = false;
+    void change({ near_plate: [x, y] });
+  });
 
   const turnLeft = h("button", { class: "btn", type: "button", html: `${icons.rotLeft} Rotate`, "aria-label": "Rotate left" });
   const turnRight = h("button", { class: "btn", type: "button", html: `${icons.rotRight} Rotate`, "aria-label": "Rotate right" });
@@ -128,6 +169,7 @@ export function cameraView(root: HTMLElement): () => void {
     { class: "card controls" },
     h("div", { class: "card-head" }, h("h2", {}, "Camera"), focusNote),
     h("div", { class: "row" }, turnLeft, turnRight, focusBtn),
+    h("div", { class: "row" }, nearBtn, nearClear),
     dark,
     h(
       "div",
@@ -162,6 +204,7 @@ export function cameraView(root: HTMLElement): () => void {
       el.disabled = !canSet || (el === gain && cam.auto_gain);
     }
     brightness.textContent = cam.brightness == null ? "–" : `${Math.round((100 * cam.brightness) / 255)} %`;
+    showTapping();
   };
 
   // --- station ----------------------------------------------------------------------------

@@ -750,6 +750,19 @@ pre.log {
   vector-effect: non-scaling-stroke;
 }
 
+.preview svg .near {
+  fill: var(--accent);
+  stroke: #fff;
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.preview.tapping {
+  cursor: crosshair;
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
 .preview svg .followed {
   fill: none;
   stroke: var(--accent);
