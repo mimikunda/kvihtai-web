@@ -11,7 +11,17 @@ export type Level = "bad" | "warn" | "info";
 export interface Alert {
   level: Level;
   text: string;
+  // where to go to see more or put it right
+  href?: string;
 }
+
+// What to do about an incident, by its kind.
+const HINTS: Record<string, string> = {
+  power: "Before unplugging the Pi, shut it down on Station: a cut can damage the memory card.",
+  crash: "If it happens again, download the diagnostics on Station and send them in.",
+  analysis: "If it happens again, download the diagnostics on Station and send them in.",
+  camera: "If this keeps happening, check the camera cable.",
+};
 
 // The station restarts itself 5 s after the camera stops; a poll or two later
 // the app would say so anyway, so this only has to cover the gap.
@@ -23,8 +33,11 @@ function minutesBetween(a: string, b: string): number {
 }
 
 export function stationAlerts(s: Status | null, stillFor: number): Alert[] {
-  if (!s) return [];
   const out: Alert[] = [];
+  if (store.broken) {
+    out.push({ level: "bad", text: `The station answers with an error: ${store.broken}`, href: "#/station" });
+  }
+  if (!s) return out;
   if (s.state === "camera error") {
     out.push({ level: "bad", text: `Camera error: ${s.error ?? "unknown"}. The station tries again every few seconds.` });
   } else if (s.state === "starting") {
@@ -45,7 +58,12 @@ export function stationAlerts(s: Status | null, stillFor: number): Alert[] {
     const last = recent[recent.length - 1];
     const ago = Math.max(0, Math.round(minutesBetween(last.at, s.clock.now)));
     const times = today.length > 1 ? ` That is ${today.length} times today.` : "";
-    out.push({ level: "warn", text: `${ago < 1 ? "Just now" : `${ago} min ago`}: ${last.what}.${times}` });
+    const hint = last.kind && HINTS[last.kind] ? ` ${HINTS[last.kind]}` : "";
+    out.push({
+      level: last.kind === "power" || last.kind === "crash" ? "bad" : "warn",
+      text: `${ago < 1 ? "Just now" : `${ago} min ago`}: ${last.what}.${times}${hint}`,
+      href: "#/station",
+    });
   }
 
   if (s.dropped >= 0.05) {
@@ -60,6 +78,14 @@ export function stationAlerts(s: Status | null, stillFor: number): Alert[] {
   if (s.recording?.error) {
     out.push({ level: "warn", text: `Recording failed: ${s.recording.error}` });
   }
+  const { mem_available_mb: free, mem_total_mb: total } = s.system;
+  if (free != null && total && free / total < 0.06) {
+    out.push({
+      level: "warn",
+      text: `The Pi's memory is nearly full (${free} MB free). A long set may be cut short, or the station restarted.`,
+      href: "#/station",
+    });
+  }
   return out;
 }
 
@@ -68,7 +94,13 @@ export function alertBox(extra: () => Alert[] = () => []): { el: HTMLElement; up
   const el = h("div", { class: "alerts" });
   const update = () => {
     const all = [...stationAlerts(store.status, store.stillFor), ...extra()];
-    el.replaceChildren(...all.map((a) => h("div", { class: `banner ${a.level}`, role: "status" }, a.text)));
+    el.replaceChildren(
+      ...all.map((a) =>
+        a.href && location.hash !== a.href
+          ? h("a", { class: `banner ${a.level}`, role: "status", href: a.href }, a.text)
+          : h("div", { class: `banner ${a.level}`, role: "status" }, a.text),
+      ),
+    );
   };
   return { el, update };
 }

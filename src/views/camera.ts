@@ -4,9 +4,10 @@
 // ends of the bar are in view; a tap on the one nearer the camera tells the
 // watcher which to follow.
 
-import { api, type CameraChange, type CameraState, type Status } from "../api";
+import { api, problem, type CameraChange, type CameraState, type Status } from "../api";
 import { h, icons } from "../dom";
 import { store } from "../store";
+import { toast } from "../ui";
 import { alertBox, type Alert } from "./alerts";
 
 const SVG = "http://www.w3.org/2000/svg";
@@ -22,11 +23,6 @@ function circle(x: number, y: number, r: number, cls: string): SVGCircleElement 
   c.setAttribute("r", String(r));
   c.setAttribute("class", cls);
   return c;
-}
-
-function fact(label: string): [HTMLElement, HTMLElement] {
-  const value = h("b", {}, "–");
-  return [h("div", {}, h("span", {}, label), value), value];
 }
 
 function distance(lens: number): string {
@@ -79,7 +75,7 @@ export function cameraView(root: HTMLElement): () => void {
       const f = store.status?.frame;
       const shown = f ? Math.min(preview.clientWidth, (preview.clientHeight * f.w) / f.h) : preview.clientWidth;
       const width = Math.min(960, Math.round(shown * Math.min(devicePixelRatio, 2)) || 480);
-      const response = await fetch(api.previewUrl(width), { cache: "no-store" });
+      const response = await fetch(api.previewUrl(width), { cache: "no-store", signal: AbortSignal.timeout(5000) });
       if (response.ok) {
         const url = URL.createObjectURL(await response.blob());
         img.src = url;
@@ -163,8 +159,8 @@ export function cameraView(root: HTMLElement): () => void {
     try {
       cam = await api.changeCamera(c);
       showCamera();
-    } catch {
-      alert("The camera did not take the setting.");
+    } catch (e) {
+      toast(`The camera did not take the setting: ${problem(e)}`, "bad");
     }
   };
 
@@ -196,7 +192,7 @@ export function cameraView(root: HTMLElement): () => void {
       await api.focus();
     } catch {
       focusing = false;
-      alert("This camera cannot focus.");
+      toast("This camera cannot focus.", "bad");
       return;
     }
     // the lens moves for a second or two; the station says when it is done
@@ -347,63 +343,12 @@ export function cameraView(root: HTMLElement): () => void {
     return out;
   });
 
-  // --- station ----------------------------------------------------------------------------
-  const [stateFact, state] = fact("State");
-  const [fpsFact, fps] = fact("Frame rate");
-  const [tempFact, temp] = fact("Temperature");
-  const [powerFact, power] = fact("Power");
-  const [recFact, rec] = fact("Recording");
-  const [freeFact, free] = fact("Free space");
-  const [clockFact, clock] = fact("Station clock");
-  const [upFact, up] = fact("Running for");
-  const station = h(
-    "section",
-    { class: "card" },
-    h("div", { class: "card-head" }, h("h2", {}, "Station")),
-    h("div", { class: "facts" }, stateFact, fpsFact, tempFact, powerFact, recFact, freeFact, clockFact, upFact),
+  root.append(
+    alerts.el,
+    preview,
+    steps,
+    h("a", { class: "more-link", href: "#/station" }, "The station's state, problems, log and power are on Station →"),
   );
-
-  const showFacts = (s: Status) => {
-    state.textContent = s.error ? `${s.state}: ${s.error}` : s.state;
-    fps.textContent = `${s.fps.toFixed(0)} fps${s.dropped >= 0.02 ? `, ${Math.round(100 * s.dropped)} % lost` : ""}`;
-    fps.classList.toggle("bad", s.dropped >= 0.05 || (s.state === "watching" && s.fps < 1));
-    const t = s.system.temp_c;
-    temp.textContent = t === undefined ? "–" : `${t.toFixed(0)} °C${s.system.throttled_now ? ", slowed down" : ""}`;
-    temp.classList.toggle("bad", (t ?? 0) >= 80 || !!s.system.throttled_now);
-    power.textContent = s.system.undervoltage ? "Too low" : "OK";
-    power.classList.toggle("bad", !!s.system.undervoltage);
-    rec.textContent = s.recording ? (s.recording.error ? `error: ${s.recording.error}` : s.recording.file ?? "off") : "off";
-    // the oldest recordings make room for new ones, so a nearly full card is normal
-    free.textContent = s.recording ? `${s.recording.free_gb.toFixed(0)} GB` : "–";
-    clock.textContent = new Date(s.clock.now).toLocaleString([], { hour: "2-digit", minute: "2-digit", day: "numeric", month: "short" });
-    const u = s.uptime_s;
-    up.textContent = u == null ? "–" : u < 120 ? `${u} s` : u < 7200 ? `${Math.round(u / 60)} min` : `${(u / 3600).toFixed(1)} h`;
-  };
-
-  // --- log -------------------------------------------------------------------------------
-  const logText = h("pre", { class: "log" });
-  const logMore = h("button", { class: "btn", type: "button" }, "Show all");
-  let logAll = false;
-  logMore.addEventListener("click", () => {
-    logAll = !logAll;
-    logMore.textContent = logAll ? "Show less" : "Show all";
-    void loadLog();
-  });
-  const logBox = h("section", { class: "card" }, h("div", { class: "card-head" }, h("h2", {}, "Station log"), logMore), logText);
-  let logTimer: number | undefined;
-  const loadLog = async () => {
-    window.clearTimeout(logTimer);
-    if (!alive) return;
-    try {
-      const lines = (await api.log()).slice().reverse();
-      logText.textContent = (logAll ? lines : lines.slice(0, 8)).join("\n") || "Nothing yet.";
-    } catch {
-      logText.textContent = "Could not load the log.";
-    }
-    logTimer = window.setTimeout(loadLog, 3000);
-  };
-
-  root.append(alerts.el, preview, steps, station, logBox);
 
   const pollCamera = async () => {
     if (!alive) return;
@@ -419,18 +364,15 @@ export function cameraView(root: HTMLElement): () => void {
   const onStatus = (s: Status | null) => {
     showPreview(s);
     alerts.update();
-    if (s) showFacts(s);
   };
   const offs = [store.on("status", onStatus), store.on("connection", () => onStatus(store.status))];
   onStatus(store.status);
   void pollCamera();
   void refresh();
-  void loadLog();
 
   return () => {
     alive = false;
     offs.forEach((off) => off());
-    window.clearTimeout(logTimer);
     document.removeEventListener("fullscreenchange", onFullscreenChange);
     document.body.classList.remove("no-scroll");
     if (objectUrl) URL.revokeObjectURL(objectUrl);

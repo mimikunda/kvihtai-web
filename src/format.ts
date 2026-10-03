@@ -1,4 +1,4 @@
-import type { Rise } from "./api";
+import type { Rise, Tags } from "./api";
 
 export const mps = (v: number | null | undefined): string => (v == null || !isFinite(v) ? "–" : v.toFixed(2));
 
@@ -50,3 +50,37 @@ export function velocityLoss(rises: Rise[]): number | null {
 export function escapeHtml(s: string): string {
   return s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 }
+
+export function bytes(n: number | null | undefined): string {
+  if (n == null) return "–";
+  if (n === 0) return "0";
+  if (n >= 1e9) return `${(n / 1e9).toFixed(n >= 1e10 ? 0 : 1)} GB`;
+  if (n >= 1e6) return `${Math.round(n / 1e6)} MB`;
+  return `${Math.max(1, Math.round(n / 1e3))} kB`;
+}
+
+export function duration(s: number | null | undefined): string {
+  if (s == null) return "–";
+  if (s < 120) return `${Math.round(s)} s`;
+  if (s < 7200) return `${Math.round(s / 60)} min`;
+  if (s < 172800) return `${(s / 3600).toFixed(1)} h`;
+  return `${Math.round(s / 86400)} days`;
+}
+
+export function kg(w: number | null | undefined): string {
+  if (w == null) return "";
+  return `${+w.toFixed(2)} kg`;
+}
+
+// "Snatch · 80 kg", or "" when nothing was said about the set.
+export function tagLabel(tags: Tags | null | undefined): string {
+  if (!tags) return "";
+  return [tags.lift, kg(tags.weight_kg)].filter(Boolean).join(" · ");
+}
+
+export function dateTime(iso: string): string {
+  return new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+// Lifts offered when saying what a set is; any other name can be typed.
+export const LIFTS = ["Snatch", "Clean & jerk", "Clean", "Jerk", "Squat", "Front squat", "Deadlift", "Pull"];

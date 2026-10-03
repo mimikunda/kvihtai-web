@@ -308,3 +308,71 @@ export function drawOverlay(
   }
   ctx.shadowBlur = 0;
 }
+
+// --- speed against weight ------------------------------------------------------------------
+
+// Each set's best mean velocity at its weight, with a straight line through
+// them once there are three weights or more.
+export function drawLoadVelocity(canvas: HTMLCanvasElement, points: { kg: number; v: number; recent: boolean }[]): void {
+  const s = surface(canvas);
+  if (!s || points.length === 0) return;
+  const { ctx, w, h } = s;
+  const left = 36, right = 10, top = 10, bottom = 22;
+  let k0 = Math.min(...points.map((p) => p.kg)), k1 = Math.max(...points.map((p) => p.kg));
+  const pad = Math.max(2.5, (k1 - k0) * 0.08);
+  k0 -= pad;
+  k1 += pad;
+  const v0 = 0, v1 = Math.max(0.5, ...points.map((p) => p.v)) * 1.12;
+  const X = (kg: number) => left + ((kg - k0) / (k1 - k0)) * (w - left - right);
+  const Y = (v: number) => top + ((v1 - v) / (v1 - v0)) * (h - top - bottom);
+
+  ctx.font = "600 11px system-ui, sans-serif";
+  ctx.fillStyle = css("--muted");
+  ctx.strokeStyle = css("--line");
+  ctx.lineWidth = 1;
+  ctx.textAlign = "right";
+  ctx.textBaseline = "middle";
+  const vStep = niceStep(v1 - v0, 4);
+  for (let v = 0; v <= v1; v += vStep) {
+    const y = Math.round(Y(v)) + 0.5;
+    ctx.beginPath(); ctx.moveTo(left, y); ctx.lineTo(w - right, y); ctx.stroke();
+    ctx.fillText(v.toFixed(1), left - 6, y);
+  }
+  ctx.textAlign = "center";
+  ctx.textBaseline = "alphabetic";
+  const kStep = niceStep(k1 - k0, 5);
+  for (let kg = Math.ceil(k0 / kStep) * kStep; kg <= k1; kg += kStep) {
+    // the last tick gives way to the unit
+    if (X(kg) < w - right - 28) ctx.fillText(`${+kg.toFixed(1)}`, X(kg), h - 6);
+  }
+  ctx.textAlign = "right";
+  ctx.fillText("kg", w - right, h - 6);
+
+  const weights = new Set(points.map((p) => p.kg));
+  if (weights.size >= 3) {
+    // least squares, velocity on weight
+    const n = points.length;
+    const mx = points.reduce((a, p) => a + p.kg, 0) / n;
+    const my = points.reduce((a, p) => a + p.v, 0) / n;
+    const sxx = points.reduce((a, p) => a + (p.kg - mx) ** 2, 0);
+    const slope = sxx > 0 ? points.reduce((a, p) => a + (p.kg - mx) * (p.v - my), 0) / sxx : 0;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(left, top, w - left - right, h - top - bottom);
+    ctx.clip();
+    ctx.strokeStyle = css("--velocity");
+    ctx.setLineDash([5, 5]);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(X(k0), Y(my + slope * (k0 - mx)));
+    ctx.lineTo(X(k1), Y(my + slope * (k1 - mx)));
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // older sets first, so that today's are on top
+  for (const p of [...points].sort((a, b) => Number(a.recent) - Number(b.recent))) {
+    ctx.fillStyle = p.recent ? css("--accent") : "rgba(138,148,163,0.75)";
+    dot(ctx, X(p.kg), Y(p.v), p.recent ? 5 : 4);
+  }
+}

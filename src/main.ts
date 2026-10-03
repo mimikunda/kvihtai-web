@@ -7,6 +7,7 @@ import { cameraView } from "./views/camera";
 import { detailView } from "./views/detail";
 import { historyView } from "./views/history";
 import { nowView } from "./views/now";
+import { stationView } from "./views/station";
 
 const STATES: Record<Status["state"], [string, string]> = {
   watching: ["watching", "Watching"],
@@ -26,11 +27,21 @@ const tabs = {
   now: h("a", { href: "#/", html: `${icons.now}<span>Now</span>` }),
   history: h("a", { href: "#/history", html: `${icons.history}<span>History</span>` }),
   camera: h("a", { href: "#/camera", html: `${icons.camera}<span>Camera</span>` }),
+  station: h("a", { href: "#/station", html: `${icons.station}<span>Station</span>` }),
 };
-const nav = h("nav", { class: "tabbar" }, tabs.now, tabs.history, tabs.camera);
+const nav = h("nav", { class: "tabbar" }, tabs.now, tabs.history, tabs.camera, tabs.station);
 document.getElementById("app")!.append(header, main, nav);
 
+// A dot on the Station tab while a problem from the last quarter of an hour stands.
+const RECENT_MS = 15 * 60000;
+function markStation(s: Status | null): void {
+  const last = s?.incidents?.[s.incidents.length - 1];
+  const recent = !!last && !!s && new Date(s.clock.now).getTime() - new Date(last.at).getTime() < RECENT_MS;
+  tabs.station.classList.toggle("alert", recent || !!store.broken || !!s?.system.undervoltage);
+}
+
 store.on("status", (s) => {
+  markStation(s);
   if (!s) return;
   const [cls, label] = STATES[s.state] ?? ["", s.state];
   pill.className = `pill ${cls}`;
@@ -39,6 +50,7 @@ store.on("status", (s) => {
 });
 
 store.on("connection", (ok) => {
+  markStation(store.status);
   banner.hidden = ok;
   if (!ok) {
     pill.className = "pill offline";
@@ -64,6 +76,9 @@ function route(): void {
   } else if (path === "/camera") {
     tab = "camera";
     unmount = cameraView(view);
+  } else if (path === "/station") {
+    tab = "station";
+    unmount = stationView(view);
   } else {
     unmount = nowView(view);
   }
